@@ -17,6 +17,12 @@ public class Bot extends TelegramLongPollingBot {
     private HashMap<Long, String> requestBase = new HashMap<>();
     private HashMap<Long, User> tempUser = new HashMap<>();
     private ArrayList<User> tempUserBase = new ArrayList<>();
+    private static final String ENTER_REQUEST = "Enter";
+    private static final String REGISTRATION_REQUEST = "Registration";
+    private static final String GROUP_NAME_REQUEST = "Group";
+    private static final String USER_NAME_REQUEST = "Name";
+    private static final String USER_SURNAME_REQUEST = "Surname";
+    private static final String STUDY_START_REQUEST = "Go";
 
     @Override
     public String getBotUsername() {
@@ -31,16 +37,16 @@ public class Bot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
 
+        if ((!update.hasMessage() || !update.getMessage().hasText()) && !update.hasCallbackQuery()) {
+            return;
+        }
+
         if (update.hasMessage() && update.getMessage().hasText()) {
             handleTextUpdate(update);
         }
 
         if (update.hasCallbackQuery()) {
             handleCallbackQuery(update);
-        }
-
-        if (!update.hasMessage() || !update.getMessage().hasText()) {
-            return;
         }
     }
 
@@ -54,19 +60,19 @@ public class Bot extends TelegramLongPollingBot {
             String lastRequest = requestBase.get(chatId);
 
             switch (lastRequest) {
-                case "Enter":
+                case ENTER_REQUEST:
                     enterRequest(update);
                     break;
-                case "Registration":
+                case REGISTRATION_REQUEST:
                     emailRegistrar(update);
                     break;
-                case "Group":
+                case GROUP_NAME_REQUEST:
                     groupRegistrar(update);
                     break;
-                case "Name":
+                case USER_NAME_REQUEST:
                     nameRegistrar(update);
                     break;
-                case "Surname":
+                case USER_SURNAME_REQUEST:
                     surnameRegistrar(update);
                     break;
             }
@@ -78,15 +84,15 @@ public class Bot extends TelegramLongPollingBot {
         String callbackQuery = update.getCallbackQuery().getData();
 
         switch (callbackQuery) {
-            case "Registration":
-                requestBase.put(chatId, "Registration");
+            case REGISTRATION_REQUEST:
+                requestBase.put(chatId, REGISTRATION_REQUEST);
                 sendText(chatId, "Начнем регистрацию. Укажи адрес электронной почты, по которому я смогу узнавать тебя в будущем", 0);
                 break;
-            case "Enter":
-                requestBase.put(chatId, "Enter");
+            case ENTER_REQUEST:
+                requestBase.put(chatId, ENTER_REQUEST);
                 sendText(chatId, "Введи адрес электронной почты", 0);
                 break;
-            case "Start":
+            case STUDY_START_REQUEST:
                 sendText(chatId, "Гоу учиться! Я создал!", 0);
                 //сюда можно дописать логику старта обучения
                 break;
@@ -110,7 +116,6 @@ public class Bot extends TelegramLongPollingBot {
             sendApiMethod(sendMessageRequest);
         } catch (TelegramApiException e) {
             e.printStackTrace();
-
         }
     }
 
@@ -120,8 +125,8 @@ public class Bot extends TelegramLongPollingBot {
         keyboard.setKeyboard(
                 Collections.singletonList(
                         Arrays.asList(
-                                InlineKeyboardButton.builder().text("Регистрация").callbackData("Registration").build(),
-                                InlineKeyboardButton.builder().text("Вход").callbackData("Enter").build()
+                                InlineKeyboardButton.builder().text("Регистрация").callbackData(REGISTRATION_REQUEST).build(),
+                                InlineKeyboardButton.builder().text("Вход").callbackData(ENTER_REQUEST).build()
                         )
                 )
         );
@@ -135,7 +140,7 @@ public class Bot extends TelegramLongPollingBot {
         keyboard.setKeyboard(
                 Collections.singletonList(
                         Collections.singletonList(
-                                InlineKeyboardButton.builder().text("Старт").callbackData("Start").build()
+                                InlineKeyboardButton.builder().text("Старт").callbackData(STUDY_START_REQUEST).build()
                         )
                 )
         );
@@ -183,7 +188,7 @@ public class Bot extends TelegramLongPollingBot {
                 user.setEmail(email);
                 user.setChatId(chatId);
                 tempUser.put(chatId, user);
-                requestBase.put(chatId, "Group");
+                requestBase.put(chatId, GROUP_NAME_REQUEST);
                 sendText(chatId, "Укажи название своей группы", 0);
             }
         }
@@ -198,7 +203,7 @@ public class Bot extends TelegramLongPollingBot {
         User user = tempUser.get(chatId);
         user.setGroupName(group);
         tempUser.put(chatId, user);
-        requestBase.put(chatId, "Name");
+        requestBase.put(chatId, USER_NAME_REQUEST);
         sendText(chatId, "Укажи своё имя", 0);
     }
 
@@ -208,7 +213,7 @@ public class Bot extends TelegramLongPollingBot {
         User user = tempUser.get(chatId);
         user.setUserName(name);
         tempUser.put(chatId, user);
-        requestBase.put(chatId, "Surname");
+        requestBase.put(chatId, USER_SURNAME_REQUEST);
         sendText(chatId, "Укажи свою фамилию", 0);
     }
 
@@ -219,7 +224,7 @@ public class Bot extends TelegramLongPollingBot {
         user.setUserSurname(surName);
         tempUser.put(chatId, user);
         putUsersToBase(chatId, tempUser);
-        requestBase.put(chatId, "Start");
+        requestBase.put(chatId, STUDY_START_REQUEST);
         sendText(chatId, "Регистрация завершена. Если готов учиться - жми Старт!", 2);
     }
 
