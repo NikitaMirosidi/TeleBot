@@ -5,11 +5,10 @@ import org.apache.commons.validator.routines.EmailValidator;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
-//статический утилитный класс. Единственный публичный метод получает на вход e-mail и новые данные по номру и имени главы.
+//статический утилитный класс. Единственный публичный метод получает на вход e-mail (для идентификации пользователя в базе) и новые данные по номеру и названию главы.
 
 public class UserStudyStatus {
     private static ArrayList<User> tempUserBase = new ArrayList<>();
@@ -17,7 +16,7 @@ public class UserStudyStatus {
     public static void changeUserStudyStatus(String email, int currentChapterNumber, String currentChapterName) {
         getUsersFromBase();
 
-        if (validateEmail(email) && !isNoUserCoincidence(email)) {
+        if (isEmailValid(email) && !isNoUserCoincidence(email)) {
             int index = 0;
 
             for (int i = 0; i < tempUserBase.size(); i++) {
@@ -35,7 +34,7 @@ public class UserStudyStatus {
         }
     }
 
-    private static boolean validateEmail(String email) { //проверка валидности e-mail
+    private static boolean isEmailValid(String email) { //проверка валидности e-mail
         EmailValidator eValidator = EmailValidator.getInstance();
         return eValidator.isValid(email);
     }
@@ -58,7 +57,7 @@ public class UserStudyStatus {
         }
     }
 
-    private static void putUsersToBase() {
+    private static void putUsersToBase() { //перезапись базы с измененным пользователем
         Gson json = new GsonBuilder().setPrettyPrinting().create();
         File file = new File("users.json");
 

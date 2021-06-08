@@ -31,43 +31,74 @@ public class Bot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
 
-        if (update.hasMessage() && update.getMessage().getText().equals("/start")) {
-            startMessage(update);
+        if (update.hasMessage() && update.getMessage().hasText()) {
+            handleTextUpdate(update);
         }
 
-        else if (update.hasMessage() && update.getMessage().hasText() && requestBase.get(update.getMessage().getChatId()).equals("Enter")) {
-            enterRequest(update);
-        }
-
-        else if (update.hasMessage() && update.getMessage().hasText() && requestBase.get(update.getMessage().getChatId()).equals("Registration")) {
-            emailRegistrar(update);
-        }
-
-        else if (update.hasMessage() && update.getMessage().hasText() && requestBase.get(update.getMessage().getChatId()).equals("Group")) {
-            groupRegistrar(update);
-        }
-
-        else if (update.hasMessage() && update.getMessage().hasText() && requestBase.get(update.getMessage().getChatId()).equals("Name")) {
-            nameRegistrar(update);
-        }
-
-        else if (update.hasMessage() && update.getMessage().hasText() && requestBase.get(update.getMessage().getChatId()).equals("Surname")) {
-            surnameRegistrar(update);
-        }
-
-        else if (update.hasCallbackQuery()) {
+        if (update.hasCallbackQuery()) {
             handleCallbackQuery(update);
+        }
+
+        if (!update.hasMessage() || !update.getMessage().hasText()) {
+            return;
         }
     }
 
-    private void sendText(long chatId, String messageText, int isKeyboard) {
+    private void handleTextUpdate(Update update) { //обработка "/start" и текстового сообщения от пользователя при наличии запроса от бота
+        long chatId = update.getMessage().getChatId();
+
+        if (update.getMessage().getText().equals("/start")) {
+            startMessage(update);
+        }
+        else {
+            String lastRequest = requestBase.get(chatId);
+
+            switch (lastRequest) {
+                case "Enter":
+                    enterRequest(update);
+                    break;
+                case "Registration":
+                    emailRegistrar(update);
+                    break;
+                case "Group":
+                    groupRegistrar(update);
+                    break;
+                case "Name":
+                    nameRegistrar(update);
+                    break;
+                case "Surname":
+                    surnameRegistrar(update);
+                    break;
+            }
+        }
+    }
+
+    private void handleCallbackQuery(Update update) { //реакции на колбеки по кнопкам
+        long chatId = update.getCallbackQuery().getFrom().getId();
+        String callbackQuery = update.getCallbackQuery().getData();
+
+        switch (callbackQuery) {
+            case "Registration":
+                requestBase.put(chatId, "Registration");
+                sendText(chatId, "Начнем регистрацию. Укажи адрес электронной почты, по которому я смогу узнавать тебя в будущем", 0);
+                break;
+            case "Enter":
+                requestBase.put(chatId, "Enter");
+                sendText(chatId, "Введи адрес электронной почты", 0);
+                break;
+            case "Start":
+                sendText(chatId, "Гоу учиться! Я создал!", 0);
+                //сюда можно дописать логику старта обучения
+                break;
+        }
+    }
+
+    private void sendText(long chatId, String messageText, int isKeyboard) { //отправка сообщения пользователю
         SendMessage sendMessageRequest = new SendMessage();
         sendMessageRequest.setChatId(Long.toString(chatId));
         sendMessageRequest.setText(messageText);
 
         switch (isKeyboard) {
-            case 0:
-                break;
             case 1:
                 sendMessageRequest.setReplyMarkup(createRegistrationKeyboard());
                 break;
@@ -79,17 +110,8 @@ public class Bot extends TelegramLongPollingBot {
             sendApiMethod(sendMessageRequest);
         } catch (TelegramApiException e) {
             e.printStackTrace();
+
         }
-    }
-
-    private void startMessage(Update update) { //ответ на первичный старт
-        long chatId = update.getMessage().getChatId();
-        String messageText = "Привет! \n" +
-                "Я Telegram бот, и я помогу подготовиться к собеседованию по JavaScrip.\n" +
-                "Если ты здесь в первый раз, то тебе нужно зарегистрироваться.\n" +
-                "А если ты уже тёртый калач, то давай продолжим. Жми Вход";
-
-        sendText(chatId, messageText,1);
     }
 
     private ReplyKeyboard createRegistrationKeyboard() { //клавиатура для регистрации
@@ -121,40 +143,30 @@ public class Bot extends TelegramLongPollingBot {
         return keyboard;
     }
 
-    private void handleCallbackQuery(Update update) { //реакции на колбеки по кнопкам
-        String callbackQuery = update.getCallbackQuery().getData();
-        Long chatId = update.getCallbackQuery().getFrom().getId();
+    private void startMessage(Update update) { //ответ на первичный старт
+        long chatId = update.getMessage().getChatId();
+        String messageText = "Привет! \n" +
+                "Я Telegram бот, и я помогу подготовиться к собеседованию по JavaScrip.\n" +
+                "Если ты здесь в первый раз, то тебе нужно зарегистрироваться.\n" +
+                "Если ты уже тёртый калач, то давай продолжим обучение. Жми Вход!";
 
-        switch (callbackQuery) {
-            case "Registration":
-                requestBase.put(chatId, "Registration");
-                sendText(chatId, "Начнем регистрацию. Укажи адрес электронной почты", 0);
-                break;
-            case "Enter":
-                requestBase.put(chatId, "Enter");
-                sendText(chatId, "Введите адрес электронной почты", 0);
-                break;
-            case "Start":
-                sendText(chatId, "Гоу учиться! Я создал!", 0);
-                //сюда можно дописать логику старта обучения
-                break;
-        }
+        sendText(chatId, messageText,1);
     }
 
     private void enterRequest(Update update) { //проверка e-mail перед входом
         long chatId = update.getMessage().getChatId();
         String email = update.getMessage().getText().trim();
 
-        if (validateEmail(email)) {
+        if (isEmailValid(email)) {
             if (isNoUserCoincidence(email)) {
-                sendText(chatId, "Пользователь с таким e-mail не зарегистрирован. Попробуйте ще раз или пройдите регистрацию", 1);
+                sendText(chatId, "Пользователь с таким e-mail не зарегистрирован. Попробуй ще раз или пройдите регистрацию", 1);
             }
             else {
-                sendText(chatId, "Вход выполнен. Если готов учиться жми Старт", 2);
+                sendText(chatId, "Вход выполнен. Если готов учиться - жми Старт!", 2);
             }
         }
         else {
-            sendText(chatId, "Адрес электронной почты указан неверно. Попробуйте еще раз", 1);
+            sendText(chatId, "Адрес электронной почты указан неверно. Попробуй еще раз", 1);
         }
     }
 
@@ -162,9 +174,9 @@ public class Bot extends TelegramLongPollingBot {
         long chatId = update.getMessage().getChatId();
         String email = update.getMessage().getText().trim();
 
-        if (validateEmail(email)) {
+        if (isEmailValid(email)) {
             if (!isNoUserCoincidence(email)) {
-                sendText(chatId, "Пользователь с таким e-mail уже зарегистрирован. Попробуйте выполнить Вход", 1);
+                sendText(chatId, "Пользователь с таким e-mail уже зарегистрирован. Попробуй выполнить Вход", 1);
             }
             else {
                 User user = new User();
@@ -172,11 +184,11 @@ public class Bot extends TelegramLongPollingBot {
                 user.setChatId(chatId);
                 tempUser.put(chatId, user);
                 requestBase.put(chatId, "Group");
-                sendText(chatId, "Укажите название своей группы", 0);
+                sendText(chatId, "Укажи название своей группы", 0);
             }
         }
         else {
-            sendText(chatId, "Адрес электронной почты указан неверно. Попробуйте еще раз", 1);
+            sendText(chatId, "Адрес электронной почты указан неверно. Попробуй еще раз", 1);
         }
     }
 
@@ -187,7 +199,7 @@ public class Bot extends TelegramLongPollingBot {
         user.setGroupName(group);
         tempUser.put(chatId, user);
         requestBase.put(chatId, "Name");
-        sendText(chatId, "Укажите своё имя", 0);
+        sendText(chatId, "Укажи своё имя", 0);
     }
 
     private void nameRegistrar(Update update) { //регистрация имени пользователя
@@ -197,7 +209,7 @@ public class Bot extends TelegramLongPollingBot {
         user.setUserName(name);
         tempUser.put(chatId, user);
         requestBase.put(chatId, "Surname");
-        sendText(chatId, "Укажите свою фамилию", 0);
+        sendText(chatId, "Укажи свою фамилию", 0);
     }
 
     private void surnameRegistrar(Update update) { //регистрация фамилии пользователя
@@ -208,7 +220,7 @@ public class Bot extends TelegramLongPollingBot {
         tempUser.put(chatId, user);
         putUsersToBase(chatId, tempUser);
         requestBase.put(chatId, "Start");
-        sendText(chatId, "Регистрация завершена. Если готов учиться жми Старт", 2);
+        sendText(chatId, "Регистрация завершена. Если готов учиться - жми Старт!", 2);
     }
 
     private void getUsersFromBase() { //получение пользователей из файла-базы во временное хранилище
@@ -243,7 +255,7 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    private boolean validateEmail(String email) { //проверка валидности e-mail
+    private boolean isEmailValid(String email) { //проверка валидности e-mail
         EmailValidator eValidator = EmailValidator.getInstance();
         return eValidator.isValid(email);
     }
